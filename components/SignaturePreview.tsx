@@ -19,7 +19,8 @@ const EmptyIcon = (
 
 export default function SignaturePreview({ data, theme }: SignaturePreviewProps) {
   const hasContent = Boolean(data.name || data.title || data.phone);
-  const titleLine = [data.title, COMPANY_NAME].filter(Boolean).join(", ");
+  // Use pipe separator between title and company
+  const titleLine = [data.title, COMPANY_NAME].filter(Boolean).join(" | ");
   const formattedPhone = formatPhoneWithDialCode(data.dialCode, data.phone);
   const hasContact = Boolean(data.phone);
 
@@ -34,9 +35,14 @@ export default function SignaturePreview({ data, theme }: SignaturePreviewProps)
     );
   }
 
+  // Build name with optional pronouns in parentheses
+  const nameDisplay = data.name && data.pronouns
+    ? <>{data.name} <span className="preview-pronouns">({data.pronouns})</span></>
+    : data.name;
+
   return (
     <div className="preview-card" data-theme={theme}>
-      {data.name && <div className="preview-name">{data.name}</div>}
+      {data.name && <div className="preview-name">{nameDisplay}</div>}
       {titleLine && (
         <div className="preview-muted">{titleLine}</div>
       )}

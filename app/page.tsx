@@ -48,6 +48,7 @@ export default function Home() {
   const defaultCountry = getDefaultCountry();
   const [data, setData] = useState<SignatureData>({
     name: "",
+    pronouns: "",
     title: "",
     phone: "",
     countryCode: defaultCountry.code,
@@ -80,6 +81,7 @@ export default function Home() {
 
           setData({
             name: parsed.name,
+            pronouns: typeof parsed.pronouns === "string" ? parsed.pronouns : "",
             title: parsed.title,
             phone: parsed.phone,
             countryCode: countryToUse.code,
@@ -197,6 +199,28 @@ export default function Home() {
                     className="clear-btn"
                     onClick={() => clearField("name")}
                     aria-label="Clear name"
+                  >
+                    {Icons.x}
+                  </button>
+                )}
+              </div>
+            </div>
+
+            <div className="field">
+              <label className="field-label" htmlFor="pronouns">Pronouns</label>
+              <div className="input-wrap">
+                <input
+                  id="pronouns"
+                  className="input"
+                  value={data.pronouns}
+                  onChange={(e) => setField("pronouns", e.target.value)}
+                />
+                {data.pronouns && (
+                  <button
+                    type="button"
+                    className="clear-btn"
+                    onClick={() => clearField("pronouns")}
+                    aria-label="Clear pronouns"
                   >
                     {Icons.x}
                   </button>
