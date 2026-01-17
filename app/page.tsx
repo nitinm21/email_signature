@@ -1,29 +1,124 @@
 "use client";
 
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import ImportModal from "@/components/ImportModal";
 import SignaturePreview from "@/components/SignaturePreview";
+import CountryCodeSelector from "@/components/CountryCodeSelector";
 import { buildSignatureHtml, SignatureData } from "@/lib/signatureHtml";
+import { useCountryDetection } from "@/hooks/useCountryDetection";
+import { Country, getCountryByCode, getDefaultCountry } from "@/lib/countries";
 
-const MAX_LOGO_SIZE_MB = 2;
+const STORAGE_KEY = "email-signature-data";
+
+// Icons as inline SVGs for crisp rendering
+const Icons = {
+  x: (
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M18 6 6 18M6 6l12 12"/>
+    </svg>
+  ),
+  copy: (
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <rect width="14" height="14" x="8" y="8" rx="2" ry="2"/>
+      <path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/>
+    </svg>
+  ),
+  check: (
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+      <polyline points="20 6 9 17 4 12"/>
+    </svg>
+  ),
+  help: (
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <circle cx="12" cy="12" r="10"/>
+      <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/>
+      <path d="M12 17h.01"/>
+    </svg>
+  ),
+  alertCircle: (
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <circle cx="12" cy="12" r="10"/>
+      <line x1="12" x2="12" y1="8" y2="12"/>
+      <line x1="12" x2="12.01" y1="16" y2="16"/>
+    </svg>
+  )
+};
 
 export default function Home() {
+  const defaultCountry = getDefaultCountry();
   const [data, setData] = useState<SignatureData>({
     name: "",
     title: "",
     phone: "",
-    twitter: "",
-    logoDataUrl: null
+    countryCode: defaultCountry.code,
+    dialCode: defaultCountry.dialCode
   });
   const [previewTheme, setPreviewTheme] = useState<"light" | "dark">("light");
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [copyStatus, setCopyStatus] = useState<"idle" | "copied" | "error">(
-    "idle"
-  );
-  const [logoError, setLogoError] = useState<string | null>(null);
-  const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const [copyStatus, setCopyStatus] = useState<"idle" | "copied" | "error">("idle");
+  const [hasLoaded, setHasLoaded] = useState(false);
+  const [countryInitialized, setCountryInitialized] = useState(false);
+
+  // Auto-detect country from IP
+  const { country: detectedCountry, isLoading: isCountryLoading } = useCountryDetection();
 
   const signaturePayload = useMemo(() => buildSignatureHtml(data), [data]);
+
+  useEffect(() => {
+    const stored = window.localStorage.getItem(STORAGE_KEY);
+    if (stored) {
+      try {
+        const parsed = JSON.parse(stored) as Partial<SignatureData>;
+        if (
+          typeof parsed?.name === "string"
+          && typeof parsed?.title === "string"
+          && typeof parsed?.phone === "string"
+        ) {
+          // Look up country if stored, otherwise use default
+          const storedCountry = parsed.countryCode ? getCountryByCode(parsed.countryCode) : null;
+          const countryToUse = storedCountry || defaultCountry;
+
+          setData({
+            name: parsed.name,
+            title: parsed.title,
+            phone: parsed.phone,
+            countryCode: countryToUse.code,
+            dialCode: countryToUse.dialCode
+          });
+
+          // If we loaded a stored country, mark as initialized
+          if (storedCountry) {
+            setCountryInitialized(true);
+          }
+        }
+      } catch {
+        // Ignore malformed stored data.
+      }
+    }
+
+    setHasLoaded(true);
+  }, []);
+
+  // Apply detected country only if no stored country was found
+  useEffect(() => {
+    if (hasLoaded && !countryInitialized && !isCountryLoading && detectedCountry) {
+      setData((prev) => ({
+        ...prev,
+        countryCode: detectedCountry.code,
+        dialCode: detectedCountry.dialCode
+      }));
+      setCountryInitialized(true);
+    }
+  }, [hasLoaded, countryInitialized, isCountryLoading, detectedCountry]);
+
+  useEffect(() => {
+    if (!hasLoaded) return;
+    try {
+      window.localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+    } catch {
+      // Ignore storage write failures (quota, privacy mode, etc.).
+    }
+  }, [data, hasLoaded]);
 
   const setField = (field: keyof SignatureData, value: string) => {
     setData((prev) => ({ ...prev, [field]: value }));
@@ -33,48 +128,22 @@ export default function Home() {
     setData((prev) => ({ ...prev, [field]: "" }));
   };
 
-  const handleUploadClick = () => {
-    setLogoError(null);
-    fileInputRef.current?.click();
+  const handleCountrySelect = (country: Country) => {
+    setData((prev) => ({
+      ...prev,
+      countryCode: country.code,
+      dialCode: country.dialCode
+    }));
   };
 
-  const handleLogoUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (!file) return;
-
-    if (!file.type.startsWith("image/")) {
-      setLogoError("Please upload an image file.");
-      return;
-    }
-
-    const fileSizeMb = file.size / 1024 / 1024;
-    if (fileSizeMb > MAX_LOGO_SIZE_MB) {
-      setLogoError("Logo must be 2MB or smaller.");
-      return;
-    }
-
-    const reader = new FileReader();
-    reader.onload = () => {
-      setData((prev) => ({ ...prev, logoDataUrl: String(reader.result) }));
-      setLogoError(null);
-    };
-    reader.readAsDataURL(file);
-  };
-
-  const clearLogo = () => {
-    setData((prev) => ({ ...prev, logoDataUrl: null }));
-    if (fileInputRef.current) fileInputRef.current.value = "";
-  };
+  // Get current selected country for the selector
+  const selectedCountry = getCountryByCode(data.countryCode) || defaultCountry;
 
   const copySignature = async () => {
     try {
       if (navigator.clipboard && window.ClipboardItem) {
-        const htmlBlob = new Blob([signaturePayload.html], {
-          type: "text/html"
-        });
-        const textBlob = new Blob([signaturePayload.plainText], {
-          type: "text/plain"
-        });
+        const htmlBlob = new Blob([signaturePayload.html], { type: "text/html" });
+        const textBlob = new Blob([signaturePayload.plainText], { type: "text/plain" });
         await navigator.clipboard.write([
           new ClipboardItem({
             "text/html": htmlBlob,
@@ -106,19 +175,21 @@ export default function Home() {
       <div className="page">
         <header className="hero fade-up">
           <h1>Create your email signature</h1>
-          <p>Fill in your details and copy it into your email client.</p>
+          <p>Fill in your details and copy the signature to your email client.</p>
         </header>
 
         <section className="content-grid">
+          {/* Form Card */}
           <div className="card form-card fade-up delay-1">
-            <label className="field">
-              Name
+            <div className="field">
+              <label className="field-label" htmlFor="name">Name</label>
               <div className="input-wrap">
                 <input
+                  id="name"
                   className="input"
                   value={data.name}
                   placeholder="Alex Morgan"
-                  onChange={(event) => setField("name", event.target.value)}
+                  onChange={(e) => setField("name", e.target.value)}
                 />
                 {data.name && (
                   <button
@@ -127,20 +198,21 @@ export default function Home() {
                     onClick={() => clearField("name")}
                     aria-label="Clear name"
                   >
-                    X
+                    {Icons.x}
                   </button>
                 )}
               </div>
-            </label>
+            </div>
 
-            <label className="field">
-              Title
+            <div className="field">
+              <label className="field-label" htmlFor="title">Title</label>
               <div className="input-wrap">
                 <input
+                  id="title"
                   className="input"
                   value={data.title}
-                  placeholder="Designer"
-                  onChange={(event) => setField("title", event.target.value)}
+                  placeholder="Product Designer"
+                  onChange={(e) => setField("title", e.target.value)}
                 />
                 {data.title && (
                   <button
@@ -149,20 +221,26 @@ export default function Home() {
                     onClick={() => clearField("title")}
                     aria-label="Clear title"
                   >
-                    X
+                    {Icons.x}
                   </button>
                 )}
               </div>
-            </label>
+            </div>
 
-            <label className="field">
-              Phone
-              <div className="input-wrap">
+            <div className="field">
+              <label className="field-label" htmlFor="phone">Phone</label>
+              <div className="input-wrap phone-input-wrap">
+                <CountryCodeSelector
+                  selectedCountry={selectedCountry}
+                  onSelect={handleCountrySelect}
+                  isLoading={isCountryLoading && !countryInitialized}
+                />
                 <input
-                  className="input"
+                  id="phone"
+                  className="input phone-input"
                   value={data.phone}
-                  placeholder="+49 151 22982"
-                  onChange={(event) => setField("phone", event.target.value)}
+                  placeholder="(555) 123-4567"
+                  onChange={(e) => setField("phone", e.target.value)}
                 />
                 {data.phone && (
                   <button
@@ -171,109 +249,70 @@ export default function Home() {
                     onClick={() => clearField("phone")}
                     aria-label="Clear phone"
                   >
-                    X
+                    {Icons.x}
                   </button>
                 )}
               </div>
-            </label>
-
-            <label className="field">
-              Twitter / X
-              <div className="input-wrap">
-                <input
-                  className="input"
-                  value={data.twitter}
-                  placeholder="@handle"
-                  onChange={(event) => setField("twitter", event.target.value)}
-                />
-                {data.twitter && (
-                  <button
-                    type="button"
-                    className="clear-btn"
-                    onClick={() => clearField("twitter")}
-                    aria-label="Clear twitter handle"
-                  >
-                    X
-                  </button>
-                )}
-              </div>
-            </label>
-
-            <div className="field">
-              Company logo
-              <div className="upload-row">
-                <button type="button" className="upload-btn" onClick={handleUploadClick}>
-                  Upload logo
-                </button>
-                <input
-                  ref={fileInputRef}
-                  type="file"
-                  accept="image/*"
-                  onChange={handleLogoUpload}
-                  hidden
-                />
-                <div className="upload-meta">
-                  {data.logoDataUrl ? (
-                    <>
-                      <img
-                        src={data.logoDataUrl}
-                        alt="Uploaded logo preview"
-                        className="logo-thumb"
-                      />
-                      <button type="button" className="btn btn-ghost" onClick={clearLogo}>
-                        Remove
-                      </button>
-                    </>
-                  ) : (
-                    <span>PNG or JPG, up to 2MB.</span>
-                  )}
-                </div>
-                {logoError && <span className="copy-status">{logoError}</span>}
-              </div>
             </div>
 
-            <div className="actions">
-              <button type="button" className="btn btn-primary" onClick={copySignature}>
-                Copy Signature
-              </button>
-              <button
-                type="button"
-                className="btn btn-secondary"
-                onClick={() => setIsModalOpen(true)}
-              >
-                How to import?
-              </button>
-              <span className="copy-status" role="status" aria-live="polite">
-                {copyStatus === "copied" && "Copied as HTML."}
-                {copyStatus === "error" && "Copy failed. Please try again."}
-              </span>
-            </div>
           </div>
 
+          {/* Preview Card */}
           <div className="card fade-up delay-2">
-            <div className="preview-header">
-              <div className="preview-title">Live preview</div>
-              <div className="toggle" role="tablist" aria-label="Preview theme">
+            <div className="preview-section">
+              <div className="preview-header">
+                <div className="preview-title">Live preview</div>
+                <div className="toggle" role="tablist" aria-label="Preview theme">
+                  <button
+                    type="button"
+                    className={previewTheme === "light" ? "active" : ""}
+                    onClick={() => setPreviewTheme("light")}
+                    role="tab"
+                    aria-selected={previewTheme === "light"}
+                  >
+                    Light
+                  </button>
+                  <button
+                    type="button"
+                    className={previewTheme === "dark" ? "active" : ""}
+                    onClick={() => setPreviewTheme("dark")}
+                    role="tab"
+                    aria-selected={previewTheme === "dark"}
+                  >
+                    Dark
+                  </button>
+                </div>
+              </div>
+              <SignaturePreview data={data} theme={previewTheme} />
+              <div className="actions">
                 <button
                   type="button"
-                  className={previewTheme === "light" ? "active" : ""}
-                  onClick={() => setPreviewTheme("light")}
+                  className={`btn btn-primary ${copyStatus === "copied" ? "success" : ""}`}
+                  onClick={copySignature}
                 >
-                  Light
+                  {copyStatus === "copied" ? Icons.check : Icons.copy}
+                  {copyStatus === "copied" ? "Copied!" : "Copy Signature"}
                 </button>
                 <button
                   type="button"
-                  className={previewTheme === "dark" ? "active" : ""}
-                  onClick={() => setPreviewTheme("dark")}
+                  className="btn btn-secondary"
+                  onClick={() => setIsModalOpen(true)}
                 >
-                  Dark
+                  {Icons.help}
+                  How to import
                 </button>
               </div>
+              {copyStatus === "error" && (
+                <span className="copy-status error" role="status" aria-live="polite">
+                  {Icons.alertCircle}
+                  Copy failed. Please try again.
+                </span>
+              )}
             </div>
-            <SignaturePreview data={data} theme={previewTheme} />
           </div>
         </section>
       </div>
+
       <ImportModal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} />
     </main>
   );

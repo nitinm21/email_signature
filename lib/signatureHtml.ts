@@ -2,8 +2,16 @@ export type SignatureData = {
   name: string;
   title: string;
   phone: string;
-  twitter: string;
-  logoDataUrl: string | null;
+  countryCode: string; // ISO country code (e.g., "US")
+  dialCode: string;    // International dial code (e.g., "+1")
+};
+
+export const formatPhoneWithDialCode = (dialCode: string, phone: string): string => {
+  if (!phone) return "";
+  // If phone already starts with +, use it as-is
+  if (phone.startsWith("+")) return phone;
+  // Otherwise prepend the dial code
+  return `${dialCode} ${phone}`;
 };
 
 export const COMPANY_NAME = "GoodPower";
@@ -16,22 +24,13 @@ const escapeHtml = (value: string) =>
     .replace(/"/g, "&quot;")
     .replace(/'/g, "&#39;");
 
-export const normalizeTwitter = (handle: string) =>
-  handle.trim().replace(/^@/, "");
-
-export const getDisplayTwitter = (handle: string) => {
-  const normalized = normalizeTwitter(handle);
-  return normalized ? `@${normalized}` : "";
-};
-
 const getPlainText = (data: SignatureData) => {
   const lines = [];
   if (data.name) lines.push(data.name);
   const titleLine = [data.title, COMPANY_NAME].filter(Boolean).join(", ");
   if (titleLine) lines.push(titleLine);
-  const contact = [data.phone, getDisplayTwitter(data.twitter)]
-    .filter(Boolean)
-    .join(" \u2022 ");
+  const formattedPhone = formatPhoneWithDialCode(data.dialCode, data.phone);
+  const contact = [formattedPhone].filter(Boolean).join(" \u2022 ");
   if (contact) lines.push(contact);
   return lines.join("\n");
 };
@@ -40,27 +39,17 @@ export const buildSignatureHtml = (data: SignatureData) => {
   const rawName = data.name.trim();
   const rawTitle = data.title.trim();
   const rawPhone = data.phone.trim();
-  const twitterHandle = normalizeTwitter(data.twitter);
-  const displayTwitter = twitterHandle ? `@${twitterHandle}` : "";
   const titleLine = [rawTitle, COMPANY_NAME].filter(Boolean).join(", ");
 
   const name = escapeHtml(rawName);
   const titleLineEscaped = escapeHtml(titleLine);
-  const phone = escapeHtml(rawPhone);
-  const displayTwitterEscaped = escapeHtml(displayTwitter);
+  const formattedPhone = formatPhoneWithDialCode(data.dialCode, rawPhone);
+  const phone = escapeHtml(formattedPhone);
 
   const contactItems = [];
   if (phone) {
-    const phoneHref = rawPhone.replace(/[^\d+]/g, "");
     contactItems.push(
-      `<a href="tel:${phoneHref}" style="color:#2b2621;text-decoration:none;">${phone}</a>`
-    );
-  }
-  if (displayTwitterEscaped && twitterHandle) {
-    contactItems.push(
-      `<a href="https://x.com/${escapeHtml(
-        encodeURIComponent(twitterHandle)
-      )}" style="color:#2b2621;text-decoration:none;">${displayTwitterEscaped}</a>`
+      `<span style="color:#2b2621;">${phone}</span>`
     );
   }
 
@@ -70,13 +59,8 @@ export const buildSignatureHtml = (data: SignatureData) => {
       )}</td></tr>`
     : "";
 
-  const logo = data.logoDataUrl
-    ? `<tr><td style="padding-bottom:10px;"><img src="${data.logoDataUrl}" alt="Company logo" width="44" height="44" style="display:block;border-radius:12px;border:1px solid #e7ddcf;object-fit:cover;" /></td></tr>`
-    : "";
-
   const html = `
 <table cellpadding="0" cellspacing="0" border="0" style="font-family:Helvetica, Arial, sans-serif;color:#2b2621;">
-  ${logo}
   ${name ? `<tr><td style="font-size:16px;font-weight:700;">${name}</td></tr>` : ""}
   ${
     titleLine
