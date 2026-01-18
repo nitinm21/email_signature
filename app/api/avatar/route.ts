@@ -39,7 +39,7 @@ export async function POST(request: Request) {
 
     const extension = extensionForType(file.type);
     const key = `avatars/${randomUUID()}${extension}`;
-    const buffer = new Uint8Array(await file.arrayBuffer());
+    const buffer = await file.arrayBuffer();
 
     const { publicUrl } = await putObjectToR2({
       key,

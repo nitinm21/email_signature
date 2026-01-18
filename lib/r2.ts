@@ -14,7 +14,7 @@ type R2Config = {
 
 type PutObjectParams = {
   key: string;
-  body: Uint8Array;
+  body: ArrayBuffer;
   contentType: string;
 };
 
@@ -64,7 +64,8 @@ export const putObjectToR2 = async ({ key, body, contentType }: PutObjectParams)
   const now = new Date();
   const amzDate = toAmzDate(now);
   const dateStamp = amzDate.slice(0, 8);
-  const payloadHash = hashSha256(body);
+  const payloadBuffer = Buffer.from(body);
+  const payloadHash = hashSha256(payloadBuffer);
   const canonicalUri = `/${encodeUriPath(bucketName)}/${encodeUriPath(key)}`;
 
   const canonicalHeaders = [
