@@ -1,6 +1,6 @@
 "use client";
 
-import { COMPANY_NAME, SignatureData, formatPhoneWithDialCode } from "@/lib/signatureHtml";
+import { DEFAULT_COMPANY_NAME, SignatureData, formatPhoneWithDialCode } from "@/lib/signatureHtml";
 
 type SignaturePreviewProps = {
   data: SignatureData;
@@ -19,9 +19,16 @@ const EmptyIcon = (
 
 export default function SignaturePreview({ data, theme }: SignaturePreviewProps) {
   const hasAvatar = Boolean(data.avatarUrl);
-  const hasContent = Boolean(data.name || data.title || data.phone || hasAvatar);
+  const companyName = data.companyName?.trim() || "";
+  const hasContent = Boolean(
+    data.name
+    || data.title
+    || data.phone
+    || hasAvatar
+    || (companyName && companyName !== DEFAULT_COMPANY_NAME)
+  );
   // Use pipe separator between title and company
-  const titleLine = [data.title, COMPANY_NAME].filter(Boolean).join(" | ");
+  const titleLine = [data.title, companyName].filter(Boolean).join(" | ");
   const formattedPhone = formatPhoneWithDialCode(data.dialCode, data.phone);
   const hasContact = Boolean(data.phone);
 

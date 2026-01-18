@@ -2,6 +2,7 @@ export type SignatureData = {
   name: string;
   pronouns: string;
   title: string;
+  companyName: string;
   phone: string;
   countryCode: string; // ISO country code (e.g., "US")
   dialCode: string;    // International dial code (e.g., "+1")
@@ -41,7 +42,7 @@ export const formatPhoneWithDialCode = (dialCode: string, phone: string): string
   return `${trimmedDialCode} ${formattedPhone}`;
 };
 
-export const COMPANY_NAME = "GoodPower";
+export const DEFAULT_COMPANY_NAME = "GoodPower";
 
 const escapeHtml = (value: string) =>
   value
@@ -58,8 +59,8 @@ const getPlainText = (data: SignatureData) => {
     const nameLine = data.pronouns ? `${data.name} (${data.pronouns})` : data.name;
     lines.push(nameLine);
   }
-  // Title | GoodPower (using pipe separator)
-  const titleLine = [data.title, COMPANY_NAME].filter(Boolean).join(" | ");
+  // Title | Company (using pipe separator)
+  const titleLine = [data.title, data.companyName].filter(Boolean).join(" | ");
   if (titleLine) lines.push(titleLine);
   const formattedPhone = formatPhoneWithDialCode(data.dialCode, data.phone);
   const contact = [formattedPhone].filter(Boolean).join(" \u2022 ");
@@ -71,10 +72,11 @@ export const buildSignatureHtml = (data: SignatureData) => {
   const rawName = data.name.trim();
   const rawPronouns = data.pronouns?.trim() || "";
   const rawTitle = data.title.trim();
+  const rawCompany = data.companyName?.trim() || "";
   const rawPhone = data.phone.trim();
   const avatarUrl = data.avatarUrl?.trim() || "";
   // Use pipe separator between title and company
-  const titleLine = [rawTitle, COMPANY_NAME].filter(Boolean).join(" | ");
+  const titleLine = [rawTitle, rawCompany].filter(Boolean).join(" | ");
 
   const name = escapeHtml(rawName);
   const pronouns = escapeHtml(rawPronouns);

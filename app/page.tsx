@@ -4,7 +4,7 @@ import { useEffect, useMemo, useRef, useState, type ChangeEvent } from "react";
 import ImportModal from "@/components/ImportModal";
 import SignaturePreview from "@/components/SignaturePreview";
 import CountryCodeSelector from "@/components/CountryCodeSelector";
-import { buildSignatureHtml, SignatureData } from "@/lib/signatureHtml";
+import { buildSignatureHtml, DEFAULT_COMPANY_NAME, SignatureData } from "@/lib/signatureHtml";
 import { useCountryDetection } from "@/hooks/useCountryDetection";
 import { Country, getCountryByCode, getDefaultCountry } from "@/lib/countries";
 
@@ -60,6 +60,7 @@ export default function Home() {
     name: "",
     pronouns: "",
     title: "",
+    companyName: DEFAULT_COMPANY_NAME,
     phone: "",
     countryCode: defaultCountry.code,
     dialCode: defaultCountry.dialCode,
@@ -98,6 +99,7 @@ export default function Home() {
             name: parsed.name,
             pronouns: typeof parsed.pronouns === "string" ? parsed.pronouns : "",
             title: parsed.title,
+            companyName: typeof parsed.companyName === "string" ? parsed.companyName : DEFAULT_COMPANY_NAME,
             phone: parsed.phone,
             countryCode: countryToUse.code,
             dialCode: countryToUse.dialCode,
@@ -322,6 +324,29 @@ export default function Home() {
                     className="clear-btn"
                     onClick={() => clearField("title")}
                     aria-label="Clear title"
+                  >
+                    {Icons.x}
+                  </button>
+                )}
+              </div>
+            </div>
+
+            <div className="field">
+              <label className="field-label" htmlFor="companyName">Company</label>
+              <div className="input-wrap">
+                <input
+                  id="companyName"
+                  className="input"
+                  value={data.companyName}
+                  placeholder="GoodPower"
+                  onChange={(e) => setField("companyName", e.target.value)}
+                />
+                {data.companyName && (
+                  <button
+                    type="button"
+                    className="clear-btn"
+                    onClick={() => clearField("companyName")}
+                    aria-label="Clear company"
                   >
                     {Icons.x}
                   </button>
