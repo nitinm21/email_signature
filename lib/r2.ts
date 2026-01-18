@@ -14,7 +14,7 @@ type R2Config = {
 
 type PutObjectParams = {
   key: string;
-  body: Buffer;
+  body: Uint8Array;
   contentType: string;
 };
 
@@ -43,7 +43,7 @@ const getR2Config = (): R2Config => {
   };
 };
 
-const hashSha256 = (payload: Buffer | string) =>
+const hashSha256 = (payload: Buffer | Uint8Array | string) =>
   createHash("sha256").update(payload).digest("hex");
 
 const hmacSha256 = (key: Buffer | string, payload: string) =>
@@ -112,7 +112,7 @@ export const putObjectToR2 = async ({ key, body, contentType }: PutObjectParams)
     headers: {
       Authorization: authorization,
       "Content-Type": contentType,
-      "Content-Length": body.length.toString(),
+      "Content-Length": body.byteLength.toString(),
       "x-amz-content-sha256": payloadHash,
       "x-amz-date": amzDate
     },
