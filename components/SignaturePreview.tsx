@@ -18,7 +18,8 @@ const EmptyIcon = (
 );
 
 export default function SignaturePreview({ data, theme }: SignaturePreviewProps) {
-  const hasContent = Boolean(data.name || data.title || data.phone);
+  const hasAvatar = Boolean(data.avatarUrl);
+  const hasContent = Boolean(data.name || data.title || data.phone || hasAvatar);
   // Use pipe separator between title and company
   const titleLine = [data.title, COMPANY_NAME].filter(Boolean).join(" | ");
   const formattedPhone = formatPhoneWithDialCode(data.dialCode, data.phone);
@@ -40,8 +41,8 @@ export default function SignaturePreview({ data, theme }: SignaturePreviewProps)
     ? <>{data.name} <span className="preview-pronouns">({data.pronouns})</span></>
     : data.name;
 
-  return (
-    <div className="preview-card" data-theme={theme}>
+  const textContent = (
+    <>
       {data.name && <div className="preview-name">{nameDisplay}</div>}
       {titleLine && (
         <div className="preview-muted">{titleLine}</div>
@@ -50,6 +51,21 @@ export default function SignaturePreview({ data, theme }: SignaturePreviewProps)
         <div className="preview-line">
           <span>{formattedPhone}</span>
         </div>
+      )}
+    </>
+  );
+
+  return (
+    <div className="preview-card" data-theme={theme}>
+      {hasAvatar ? (
+        <div className="preview-layout">
+          <img className="preview-avatar" src={data.avatarUrl} alt="" />
+          <div className="preview-text">
+            {textContent}
+          </div>
+        </div>
+      ) : (
+        textContent
       )}
     </div>
   );

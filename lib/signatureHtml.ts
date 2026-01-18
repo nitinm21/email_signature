@@ -5,6 +5,7 @@ export type SignatureData = {
   phone: string;
   countryCode: string; // ISO country code (e.g., "US")
   dialCode: string;    // International dial code (e.g., "+1")
+  avatarUrl?: string;
 };
 
 // Format phone number with hyphens (e.g., "6095775523" -> "609-577-5523")
@@ -71,6 +72,7 @@ export const buildSignatureHtml = (data: SignatureData) => {
   const rawPronouns = data.pronouns?.trim() || "";
   const rawTitle = data.title.trim();
   const rawPhone = data.phone.trim();
+  const avatarUrl = data.avatarUrl?.trim() || "";
   // Use pipe separator between title and company
   const titleLine = [rawTitle, COMPANY_NAME].filter(Boolean).join(" | ");
 
@@ -98,7 +100,7 @@ export const buildSignatureHtml = (data: SignatureData) => {
     ? `${name} <span style="font-weight:400;">(${pronouns})</span>`
     : name;
 
-  const html = `
+  const infoTable = `
 <table cellpadding="0" cellspacing="0" border="0" style="font-family:Helvetica, Arial, sans-serif;color:#2b2621;">
   ${name ? `<tr><td style="font-size:16px;font-weight:700;">${nameWithPronouns}</td></tr>` : ""}
   ${
@@ -109,6 +111,22 @@ export const buildSignatureHtml = (data: SignatureData) => {
   ${contactLine}
 </table>
 `.trim();
+
+  const html = avatarUrl
+    ? `
+<table cellpadding="0" cellspacing="0" border="0" style="font-family:Helvetica, Arial, sans-serif;color:#2b2621;">
+  <tr>
+    <td style="padding-right:16px;vertical-align:top;">
+      <img src="${avatarUrl}" width="72" height="72" alt=""
+           style="display:block;border-radius:50%;object-fit:cover;" />
+    </td>
+    <td style="vertical-align:top;">
+      ${infoTable}
+    </td>
+  </tr>
+</table>
+`.trim()
+    : infoTable;
 
   return { html, plainText: getPlainText(data) };
 };

@@ -307,6 +307,42 @@ h1, h2, h3, h4, h5, h6 {
   background: var(--bg-card);
 }
 
+.input.file-input {
+  padding-right: 14px;
+}
+
+.avatar-row {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.field-hint {
+  font-size: 0.8rem;
+  color: var(--text-tertiary);
+}
+
+.field-message {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.8rem;
+}
+
+.field-message svg {
+  width: 14px;
+  height: 14px;
+}
+
+.field-error {
+  color: var(--error);
+}
+
+.field-warning {
+  color: #b45309;
+}
+
 /* Clear button */
 .clear-btn {
   position: absolute;
@@ -556,6 +592,25 @@ h1, h2, h3, h4, h5, h6 {
 .preview-card[data-theme="dark"] .preview-muted,
 .preview-card[data-theme="dark"] .preview-line {
   color: #b5b5b5;
+}
+
+.preview-layout {
+  display: flex;
+  gap: 16px;
+  align-items: center;
+}
+
+.preview-avatar {
+  width: 72px;
+  height: 72px;
+  border-radius: 50%;
+  object-fit: cover;
+  flex: 0 0 auto;
+}
+
+.preview-text {
+  display: flex;
+  flex-direction: column;
 }
 
 .preview-name {

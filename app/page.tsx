@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type ChangeEvent } from "react";
 import ImportModal from "@/components/ImportModal";
 import SignaturePreview from "@/components/SignaturePreview";
 import CountryCodeSelector from "@/components/CountryCodeSelector";
@@ -9,6 +9,7 @@ import { useCountryDetection } from "@/hooks/useCountryDetection";
 import { Country, getCountryByCode, getDefaultCountry } from "@/lib/countries";
 
 const STORAGE_KEY = "email-signature-data";
+const MAX_AVATAR_BYTES = 20 * 1024 * 1024;
 
 // Icons as inline SVGs for crisp rendering
 const Icons = {
@@ -41,6 +42,15 @@ const Icons = {
       <line x1="12" x2="12" y1="8" y2="12"/>
       <line x1="12" x2="12.01" y1="16" y2="16"/>
     </svg>
+  ),
+  trash: (
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M3 6h18"/>
+      <path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
+      <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/>
+      <path d="M10 11v6"/>
+      <path d="M14 11v6"/>
+    </svg>
   )
 };
 
@@ -52,13 +62,18 @@ export default function Home() {
     title: "",
     phone: "",
     countryCode: defaultCountry.code,
-    dialCode: defaultCountry.dialCode
+    dialCode: defaultCountry.dialCode,
+    avatarUrl: ""
   });
   const [previewTheme, setPreviewTheme] = useState<"light" | "dark">("light");
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [copyStatus, setCopyStatus] = useState<"idle" | "copied" | "error">("idle");
   const [hasLoaded, setHasLoaded] = useState(false);
   const [countryInitialized, setCountryInitialized] = useState(false);
+  const [avatarError, setAvatarError] = useState("");
+  const [isAvatarUploading, setIsAvatarUploading] = useState(false);
+  const [storageWarning, setStorageWarning] = useState("");
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   // Auto-detect country from IP
   const { country: detectedCountry, isLoading: isCountryLoading } = useCountryDetection();
@@ -85,7 +100,8 @@ export default function Home() {
             title: parsed.title,
             phone: parsed.phone,
             countryCode: countryToUse.code,
-            dialCode: countryToUse.dialCode
+            dialCode: countryToUse.dialCode,
+            avatarUrl: typeof parsed.avatarUrl === "string" ? parsed.avatarUrl : ""
           });
 
           // If we loaded a stored country, mark as initialized
@@ -117,8 +133,9 @@ export default function Home() {
     if (!hasLoaded) return;
     try {
       window.localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+      setStorageWarning("");
     } catch {
-      // Ignore storage write failures (quota, privacy mode, etc.).
+      setStorageWarning("Storage is full. Your avatar will not persist after refresh.");
     }
   }, [data, hasLoaded]);
 
@@ -128,6 +145,67 @@ export default function Home() {
 
   const clearField = (field: keyof SignatureData) => {
     setData((prev) => ({ ...prev, [field]: "" }));
+  };
+
+  const uploadAvatar = async (file: File) => {
+    const formData = new FormData();
+    formData.append("file", file);
+
+    const response = await fetch("/api/avatar", {
+      method: "POST",
+      body: formData
+    });
+
+    if (!response.ok) {
+      const payload = await response.json().catch(() => null);
+      const message = payload?.error || "We could not upload that file.";
+      throw new Error(message);
+    }
+
+    const payload = await response.json();
+    if (!payload?.url) {
+      throw new Error("We could not upload that file.");
+    }
+
+    return payload.url as string;
+  };
+
+  const handleAvatarChange = async (event: ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    setAvatarError("");
+
+    if (file.size > MAX_AVATAR_BYTES) {
+      setAvatarError("Image must be 20 MB or less.");
+      if (fileInputRef.current) {
+        fileInputRef.current.value = "";
+      }
+      return;
+    }
+
+    setIsAvatarUploading(true);
+    try {
+      const url = await uploadAvatar(file);
+      setData((prev) => ({ ...prev, avatarUrl: url }));
+      setAvatarError("");
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "We could not upload that file.";
+      setAvatarError(message);
+      if (fileInputRef.current) {
+        fileInputRef.current.value = "";
+      }
+    } finally {
+      setIsAvatarUploading(false);
+    }
+  };
+
+  const removeAvatar = () => {
+    setData((prev) => ({ ...prev, avatarUrl: "" }));
+    setAvatarError("");
+    if (fileInputRef.current) {
+      fileInputRef.current.value = "";
+    }
   };
 
   const handleCountrySelect = (country: Country) => {
@@ -277,6 +355,51 @@ export default function Home() {
                   </button>
                 )}
               </div>
+            </div>
+
+            <div className="field">
+              <label className="field-label" htmlFor="avatar">Avatar</label>
+              <div className="avatar-row">
+                <input
+                  id="avatar"
+                  ref={fileInputRef}
+                  className="input file-input"
+                  type="file"
+                  accept="image/*"
+                  onChange={handleAvatarChange}
+                  disabled={isAvatarUploading}
+                />
+                {data.avatarUrl && (
+                  <button
+                    type="button"
+                    className="btn btn-ghost avatar-remove"
+                    onClick={removeAvatar}
+                    aria-label="Remove avatar"
+                    disabled={isAvatarUploading}
+                  >
+                    {Icons.trash}
+                    Remove
+                  </button>
+                )}
+              </div>
+              <div className="field-hint">PNG, JPG, or WebP up to 20 MB.</div>
+              {isAvatarUploading && (
+                <div className="field-message" role="status" aria-live="polite">
+                  Uploading avatar...
+                </div>
+              )}
+              {avatarError && (
+                <div className="field-message field-error" role="status" aria-live="polite">
+                  {Icons.alertCircle}
+                  {avatarError}
+                </div>
+              )}
+              {storageWarning && data.avatarUrl && (
+                <div className="field-message field-warning" role="status" aria-live="polite">
+                  {Icons.alertCircle}
+                  {storageWarning}
+                </div>
+              )}
             </div>
 
           </div>
