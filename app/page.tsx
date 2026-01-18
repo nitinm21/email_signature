@@ -287,7 +287,7 @@ export default function Home() {
             </div>
 
             <div className="field">
-              <label className="field-label" htmlFor="pronouns">Pronouns</label>
+              <label className="field-label" htmlFor="pronouns">Pronouns (optional)</label>
               <div className="input-wrap">
                 <input
                   id="pronouns"
